@@ -4,13 +4,16 @@ A python implementation for simplex method
 The current implementation uses two phase method and is able to identify case for Infeasible solution, Unbounded solution,
 Degeneracy and Alternate Solution.
 In case of Infeasible solution and Unbounded solution it raises an ValueError and in case of Degeneracy and Alternate Solution
-it gives a warning.
+it gives a warning and returns a optimum solution.
+
 
 The constraints right hand side should be positive and all variables should hold non-negativity conditions.
+
 Rules for constraint representation:
 
 - Each variable should have coefficient if it is in constraint i.e
-  `x_1` is not allowd instead use `1x_1`.
+  `x_1` is not allowd instead use `1x_1`. Note that it is not necessary to represent each variable in a constraint, but if
+  a variable is there then it should have a coefficient.
 - Only single spaces should be used.
 - For a variable `x_i` i should be an integer in `[1, num_vars]`, where `num_vars` is number of variables
 
