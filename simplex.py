@@ -1,4 +1,6 @@
 from fractions import Fraction
+from warnings import warn
+
 
 class Simplex(object):
     def __init__(self, num_vars, constraints, objective_function):
@@ -26,13 +28,22 @@ class Simplex(object):
         self.objective_function = objective_function[1]
         self.coeff_matrix, self.r_rows, self.num_s_vars, self.num_r_vars = self.construct_matrix_from_constraints()
         del self.constraints
+        self.basic_vars = [0 for i in range(len(self.coeff_matrix))]
         self.phase1()
+        r_index = self.num_r_vars + self.num_s_vars
+
+        for i in self.basic_vars:
+            if i > r_index:
+                raise ValueError("Infeasible solution")
+
         self.delete_r_vars()
-        if 'min' in self.objective:
+
+        if 'min' in self.objective.lower():
             self.solution = self.objective_minimize()
 
         else:
             self.solution = self.objective_maximize()
+        self.optimize_val = self.coeff_matrix[0][-1]
 
     def construct_matrix_from_constraints(self):
         num_s_vars = 0  # number of slack and surplus variables
@@ -93,6 +104,13 @@ class Simplex(object):
         coeff_0 = 0
         for i in self.r_rows:
             self.coeff_matrix[0] = add_row(self.coeff_matrix[0], self.coeff_matrix[i])
+            self.basic_vars[i] = r_index
+            r_index += 1
+        s_index = self.num_vars
+        for i in range(1, len(self.basic_vars)):
+            if self.basic_vars[i] == 0:
+                self.basic_vars[i] = s_index
+                s_index += 1
 
         # Run the simplex iterations
         key_column = max_index(self.coeff_matrix[0])
@@ -101,23 +119,30 @@ class Simplex(object):
         while condition is True:
 
             key_row = self.find_key_row(key_column = key_column)
+            self.basic_vars[key_row] = key_column
             pivot = self.coeff_matrix[key_row][key_column]
-            self.update_row_acc_to_pivot(key_row, pivot)
+            self.normalize_to_pivot(key_row, pivot)
             self.make_key_column_zero(key_column, key_row)
 
             key_column = max_index(self.coeff_matrix[0])
             condition = self.coeff_matrix[0][key_column] > 0
 
     def find_key_row(self, key_column):
-        ele = [float("inf") for i in range(len(self.coeff_matrix))]
+        min_val = float("inf")
+        min_i = 0
         for i in range(1, len(self.coeff_matrix)):
             if self.coeff_matrix[i][key_column] > 0:
-                ele[i] = self.coeff_matrix[i][-1] / self.coeff_matrix[i][key_column]
+                val = self.coeff_matrix[i][-1] / self.coeff_matrix[i][key_column]
+                if val <  min_val:
+                    min_val = val
+                    min_i = i
+        if min_val == float("inf"):
+            raise ValueError("Unbounded solution")
+        if min_val == 0:
+            warn("Dengeneracy")
+        return min_i
 
-        key_row = min_index(ele)
-        return key_row
-
-    def update_row_acc_to_pivot(self, key_row, pivot):
+    def normalize_to_pivot(self, key_row, pivot):
         for i in range(len(self.coeff_matrix[0])):
             self.coeff_matrix[key_row][i] /= pivot
 
@@ -132,8 +157,10 @@ class Simplex(object):
     def delete_r_vars(self):
         for i in range(len(self.coeff_matrix)):
             non_r_length = self.num_vars + self.num_s_vars + 1
-            while len(self.coeff_matrix[i]) != non_r_length:
+            length = len(self.coeff_matrix[i])
+            while length != non_r_length:
                 del self.coeff_matrix[i][non_r_length-1]
+                length -= 1
 
     def update_objective_function(self):
         objective_function_coeffs = self.objective_function.split()
@@ -145,8 +172,18 @@ class Simplex(object):
                 else:
                     self.coeff_matrix[0][int(index)-1] = Fraction("-" + coeff[:-1] + "/1")
 
+    def check_alternate_solution(self):
+        for i in range(len(self.coeff_matrix[0])):
+            if self.coeff_matrix[0][i] and i not in self.basic_vars[1:]:
+                warn("Alternate Solution exists")
+                break
+
     def objective_minimize(self):
         self.update_objective_function()
+
+        for row, column in enumerate(self.basic_vars[1:]):
+            if self.coeff_matrix[0][column] != 0:
+                self.coeff_matrix[0] = add_row(self.coeff_matrix[0], multiply_const_row(-self.coeff_matrix[0][column], self.coeff_matrix[row+1]))
 
         key_column = max_index(self.coeff_matrix[0])
         condition = self.coeff_matrix[0][key_column] > 0
@@ -154,20 +191,58 @@ class Simplex(object):
         while condition is True:
 
             key_row = self.find_key_row(key_column = key_column)
+            self.basic_vars[key_row] = key_column
             pivot = self.coeff_matrix[key_row][key_column]
-            self.update_row_acc_to_pivot(key_row, pivot)
+            self.normalize_to_pivot(key_row, pivot)
             self.make_key_column_zero(key_column, key_row)
 
             key_column = max_index(self.coeff_matrix[0])
             condition = self.coeff_matrix[0][key_column] > 0
 
         solution = {}
-        for i in range(1, len(self.coeff_matrix)):
-            solution['x_'+str(i)] = self.coeff_matrix[i][-1]
+        for i, var in enumerate(self.basic_vars[1:]):
+            if var < self.num_vars:
+                solution['x_'+str(var+1)] = self.coeff_matrix[i+1][-1]
+
+        for i in range(0, self.num_vars):
+            if i not in self.basic_vars[1:]:
+                solution['x_'+str(i+1)] = Fraction("0/1")
+        self.check_alternate_solution()
         return solution
 
     def objective_maximize(self):
         self.update_objective_function()
+
+        for row, column in enumerate(self.basic_vars[1:]):
+            if self.coeff_matrix[0][column] != 0:
+                self.coeff_matrix[0] = add_row(self.coeff_matrix[0], multiply_const_row(-self.coeff_matrix[0][column], self.coeff_matrix[row+1]))
+
+        key_column = min_index(self.coeff_matrix[0])
+        condition = self.coeff_matrix[0][key_column] < 0
+
+        while condition is True:
+
+            key_row = self.find_key_row(key_column = key_column)
+            self.basic_vars[key_row] = key_column
+            pivot = self.coeff_matrix[key_row][key_column]
+            self.normalize_to_pivot(key_row, pivot)
+            self.make_key_column_zero(key_column, key_row)
+
+            key_column = min_index(self.coeff_matrix[0])
+            condition = self.coeff_matrix[0][key_column] < 0
+
+        solution = {}
+        for i, var in enumerate(self.basic_vars[1:]):
+            if var < self.num_vars:
+                solution['x_'+str(var+1)] = self.coeff_matrix[i+1][-1]
+
+        for i in range(0, self.num_vars):
+            if i not in self.basic_vars[1:]:
+                solution['x_'+str(i+1)] = Fraction("0/1")
+
+        self.check_alternate_solution()
+
+        return solution
 
 def add_row(row1, row2):
     row_sum = [0 for i in range(len(row1))]
@@ -183,6 +258,12 @@ def max_index(row):
 
     return max_i
 
+def multiply_const_row(const, row):
+    mul_row = []
+    for i in row:
+        mul_row.append(const*i)
+    return mul_row
+
 def min_index(row):
     min_i = 0
     for i in range(0, len(row)):
@@ -191,9 +272,3 @@ def min_index(row):
 
     return min_i
 
-
-constraints = ['3x_1 + 1x_2 = 3', '4x_1 + 3x_2 >= 6', '1x_1 + 2x_2 <= 4']
-simplex_object = Simplex(2, constraints, ('min', '3x_1 + 1x_2'))
-for i in simplex_object.coeff_matrix:
-    print(i)
-print(simplex_object.solution)
