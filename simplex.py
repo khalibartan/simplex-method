@@ -60,7 +60,7 @@ class Simplex(object):
                 num_r_vars += 1
         total_vars = self.num_vars + num_s_vars + num_r_vars
 
-        coeff_matrix = [[Fraction("0/1") for i in range(total_vars+1)] for j in range(len(self.constraints)+1)]
+        coeff_matrix = [[Fraction("0") for i in range(total_vars+1)] for j in range(len(self.constraints)+1)]
         s_index = self.num_vars
         r_index = self.num_vars + num_s_vars
         r_rows = [] # stores the non -zero index of r
@@ -72,27 +72,27 @@ class Simplex(object):
                 if '_' in constraint[j]:
                     coeff, index = constraint[j].split('_')
                     if constraint[j-1] is '-':
-                        coeff_matrix[i][int(index)-1] = Fraction("-" + coeff[:-1] + "/1")
+                        coeff_matrix[i][int(index)-1] = Fraction("-" + coeff[:-1] + "")
                     else:
-                        coeff_matrix[i][int(index)-1] = Fraction(coeff[:-1] + "/1")
+                        coeff_matrix[i][int(index)-1] = Fraction(coeff[:-1] + "")
 
                 elif constraint[j] == '<=':
-                    coeff_matrix[i][s_index] = Fraction("1/1")  # add surplus variable
+                    coeff_matrix[i][s_index] = Fraction("1")  # add surplus variable
                     s_index += 1
 
                 elif constraint[j] == '>=':
-                    coeff_matrix[i][s_index] = Fraction("-1/1")  # slack variable
-                    coeff_matrix[i][r_index] = Fraction("1/1")   # r variable
+                    coeff_matrix[i][s_index] = Fraction("-1")  # slack variable
+                    coeff_matrix[i][r_index] = Fraction("1")   # r variable
                     s_index += 1
                     r_index += 1
                     r_rows.append(i)
 
                 elif constraint[j] == '=':
-                    coeff_matrix[i][r_index] = Fraction("1/1")  # r variable
+                    coeff_matrix[i][r_index] = Fraction("1")  # r variable
                     r_index += 1
                     r_rows.append(i)
 
-            coeff_matrix[i][-1] = Fraction(constraint[-1] + "/1")
+            coeff_matrix[i][-1] = Fraction(constraint[-1] + "")
 
         return coeff_matrix, r_rows, num_s_vars, num_r_vars
 
@@ -100,7 +100,7 @@ class Simplex(object):
         # Objective function here is minimize r1+ r2 + r3 + ... + rn
         r_index = self.num_vars + self.num_s_vars
         for i in range(r_index, len(self.coeff_matrix[0])-1):
-            self.coeff_matrix[0][i] = Fraction("-1/1")
+            self.coeff_matrix[0][i] = Fraction("-1")
         coeff_0 = 0
         for i in self.r_rows:
             self.coeff_matrix[0] = add_row(self.coeff_matrix[0], self.coeff_matrix[i])
@@ -168,9 +168,9 @@ class Simplex(object):
             if '_' in objective_function_coeffs[i]:
                 coeff, index = objective_function_coeffs[i].split('_')
                 if objective_function_coeffs[i-1] is '-':
-                    self.coeff_matrix[0][int(index)-1] = Fraction(coeff[:-1] + "/1")
+                    self.coeff_matrix[0][int(index)-1] = Fraction(coeff[:-1] + "")
                 else:
-                    self.coeff_matrix[0][int(index)-1] = Fraction("-" + coeff[:-1] + "/1")
+                    self.coeff_matrix[0][int(index)-1] = Fraction("-" + coeff[:-1] + "")
 
     def check_alternate_solution(self):
         for i in range(len(self.coeff_matrix[0])):
@@ -206,7 +206,7 @@ class Simplex(object):
 
         for i in range(0, self.num_vars):
             if i not in self.basic_vars[1:]:
-                solution['x_'+str(i+1)] = Fraction("0/1")
+                solution['x_'+str(i+1)] = Fraction("0")
         self.check_alternate_solution()
         return solution
 
@@ -238,7 +238,7 @@ class Simplex(object):
 
         for i in range(0, self.num_vars):
             if i not in self.basic_vars[1:]:
-                solution['x_'+str(i+1)] = Fraction("0/1")
+                solution['x_'+str(i+1)] = Fraction("0")
 
         self.check_alternate_solution()
 
